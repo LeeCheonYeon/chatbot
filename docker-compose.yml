@@ -1,0 +1,18 @@
+services:
+  tei-reranker:
+    image: ghcr.io/huggingface/text-embeddings-inference:cuda-1.8
+    container_name: chatbot-reranker
+    # GPU 사용을 위한 필수 설정
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "8004:80"
+    volumes:
+      - ./reranker:/data
+    # 리랭커 모델 지정 (BAAI/bge-reranker-v2-m3 추천)
+    command: --model-id BAAI/bge-reranker-v2-m3 --port 80
