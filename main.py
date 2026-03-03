@@ -47,14 +47,14 @@ def run_consulting_system():
                 if not initial_docs:
                     print("⚠️ 검색된 기본 자료가 없습니다.")
                     continue
-                """
+                print(f"{len(initial_docs.points)} 개의 참고자료")
                 refined_docs = [point.payload.get("text", "") for point in initial_docs.points]
                 # 3. 리랭커 필터링 (2단계: 점수 0.5 이상, 상위 3개 정밀 선별)
                 # 이제 이 함수가 텍스트까지 포함된 리스트를 반환합니다.
                 print("🎯 자료의 정확도를 분석 중입니다...")
-                refined_query =  f"{user_query}. {keyword_list}"
+                refined_query =  f"{vector_query} {keyword_list}"
                 print(refined_query)
-                refined_data = get_refined_context(
+                refined_data = utill.get_refined_context_rearrange(
                     query=refined_query, 
                     documents=refined_docs, 
                     top_n=5, 
@@ -74,10 +74,16 @@ def run_consulting_system():
                 """
                 #받은 문장들을 하나의 변수로 저장
                 context_text = "\n".join(point.payload.get("full_contents", "") for point in initial_docs.points)
+                """
+                  # (선택 사항) 디버깅용 점수 출력
+                if refined_data:
+                    scores = [f"{item['score']:.2f}" for item in refined_data]
+                    print(f"참고 자료 신뢰도: {', '.join(scores)}")
+                    
                 if context_text:
                     # 5. Ollama 답변 생성 (최종 단계)
                     print("✍️ 답변을 생성하는 중입니다. 잠시만 기다려 주세요...\n")
-                    answer = utill.ask_ollama(user_query, context_text)
+                    answer = utill.ask_ollama(context_text,user_query)
                     utill.update_memory('test', user_query, answer)
                     # 만약 답변에 '찾을 수 없습니다'가 포함되어 있다면, 그냥 문장 전체를 교체
                     if "정보를 찾을 수 없습니다" in answer:
@@ -89,12 +95,7 @@ def run_consulting_system():
                     print("-" * 40)
                     print(f"📢 상담관 답변:\n\n{answer}")
                     print("-" * 40)
-                    """
-                    # (선택 사항) 디버깅용 점수 출력
-                    if refined_data:
-                        scores = [f"{item['score']:.2f}" for item in refined_data]
-                        print(f"참고 자료 신뢰도: {', '.join(scores)}")
-                    """
+                    
                 else:
                     answer = '질문에 대한 답변을 찾지 못하였습니다.'
                     utill.update_memory('test', user_query, answer)

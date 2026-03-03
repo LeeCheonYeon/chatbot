@@ -183,26 +183,27 @@ def search_collection_data_hybrid(collection_nm: str = COLLECTION_NAME, field_nm
         search_result = client.query_points(
             collection_name=collection_nm,
             prefetch=[
-                # (A) 벡터 검색: 의미적 유사성 기반 (2배수 추출)
+                # (A) 벡터 검색: 의미적 유사성 기반 (3배수 추출)
                 models.Prefetch(
                     query=vector_query_text,
-                    limit=limit_count * 2,
+                    limit=limit_count * 3,
                     score_threshold=0.5
                 ),
-                # (B) 키워드 검색: 특정 단어 포함 여부 기반 (2배수 추출)
-                models.Prefetch(
-                    # 점수 기준이 없어도 RRF가 순위를 매길 수 있도록 빈 벡터나 더미를 주지 않고,
-                    # 필터만 적용된 Prefetch 구조를 사용합니다.
+                # (B) 키워드 검색: 특정 단어 포함 여부 기반 (3배수 추출)
+               models.Prefetch(
+                    # 필터를 사용하여 키워드 검색 대상을 특정합니다.
                     filter=models.Filter(
                         must=[
                             models.FieldCondition(
-                                key=field_nm,
-                                match=models.MatchText(text=keyword_text)
+                                key=field_nm,  # 필드 이름은 여기서 정의 (예: 'full_contents')
+                                match=models.MatchText(
+                                    text=keyword_text  # 매칭될 텍스트는 여기서 정의
+                                )
                             )
                         ]
                     ),
-                    limit=limit_count * 2
-                ),
+                    limit=limit_count * 3
+                )
             ],
             # (C) RRF 알고리즘으로 두 결과의 순위를 하나로 통합
             query=models.FusionQuery(fusion=models.Fusion.RRF),
@@ -227,7 +228,7 @@ def get_rerank(query: str, documents: List[str]) -> List[Dict[str, Any]]:
     return response.json()
 
 #리랭커로 순위 정렬 후 상위n개만 반환
-def get_refined_context(query: str, documents: List[str], top_n: int = 5,min_score: float = 0.5) -> Dict[str, Any]:
+def get_refined_context_rearrange(query: str, documents: List[str], top_n: int = 5,min_score: float = 0.5) -> Dict[str, Any]:
     """
     리랭커 서버의 응답 형식([{"index": i, "score": s}, ...])을 그대로 유지하며
     상위 N개만 잘라서 반환합니다.
@@ -260,20 +261,23 @@ def ask_ollama(context_text: str, user_query:str):
     final_prompt = f"""[참고 자료]\n
                 {context_text}\n
                 [사용자 질문]\n
-                {user_query}\n"""
-
+                '{user_query}'에 대해 상세히 설명해줘."""
     response = ollama_client.chat(model=OLLAMA_MODEL, messages=[
         {
             "role": "system",
             "content": (
-                "당신은 제공된 [참고 자료]에만 근거하여 답변하는 비즈니스 비서입니다.\n"
+                "당신은 제공된 [참고 자료]에만 근거하여 답변하는 어린이집안전공제회 비즈니스 비서입니다.\n"
                 "### 반드시 지켜야 할 출력 원칙 ###\n"
-                "1. 자료에 답변 근거가 있다면: '핵심 결론'을 먼저 말하고 상세 내용을 경어체로 설명하세요.\n"
+                "1. 자료에 답변 근거가 있다면: 상세 내용을 경어체로 설명하세요.\n"
                 "2. 자료에 답변 근거가 전혀 없다면: 군더더기 없이 '정보를 찾을 수 없습니다.' 딱 한 문장만 출력하세요.\n"
                 "3. 질문의 의도를 파악할 수 없다면: '질문에 대해 모르겠습니다.' 딱 한 문장만 출력하세요.\n"
                 "4. 절대 사견, 해설, '참고하여 작성했습니다' 등의 부연 설명을 하지 마세요.\n"
                 "5. 모든 답변은 한국어로만 작성하세요."
-        )
+                "6. 분석 단계: [참고 자료] 내에 [사용자 질문]에 대한 직접적인 정보가 있는지 확인한다.\n"
+                "7. 출력 단계 (성공): 정보가 있다면, 자료에 근거하여 상세히 답변한다. 반드시 경어체를 사용한다.\n"
+                "8. 출력 단계 (성공): 정확한 정보만 사용하여 답변한다.\n"
+                "9. 출력 단계 (실패): 자료에 직접적인 정보가 없거나, 질문이 자료와 관련 없다면 오직 '정보를 찾을 수 없습니다.' 한 문장만 출력한다.\n"
+           )
         },
         {
             'role': 'user',
@@ -295,13 +299,19 @@ def rewrite_question(question):
             "role": "system",
             "content": (
                 "### 역할 ###\n"
-                "너는 사용자의 질문을 분석하여 '벡터 검색용 문장'과 '키워드 검색용 단어'로 변환하는 전문 쿼리 생성기이다.\n"
+                "너는 사용자의 질문을 분석하여 '벡터 검색용 문장'과 '키워드 검색용 단어'로 변환하는 어린이집안전공제회 전문 쿼리 생성기이다.\n"
                  "지시사항: 지금부터 너는 인간의 말을 하는 AI가 아니라, 텍스트를 받으면'벡터 검색용 문장'과 '키워드 검색용 단어' 형태의 데이터만 뱉는 변환기이다. 인사말, 해설, 판단 근거를 출력하는 즉시 시스템 에러가 발생하므로 절대 출력하지 마라.\n"
 
-                "### 규칙 ###\n"
+                "### 절대 규칙 ###\n"
                 "1. 절대 사용자의 질문에 답하지 마라. (예: '~입니다', '~하세요' 금지)\n"
                 "2. 반드시 질문에 없는 정보를 상상해서 추가하지 마라.\n"
                 "3. 출력은 반드시 아래 형식을 지켜라.\n"
+                
+                "### 부정어 처리 규칙 ###\n"
+                
+                "1. 사용자가 '~말고', '~제외하고', '~아닌' 등의 표현을 쓰면, 해당 단어는 [검색 키워드]에서 완전히 제거하라.\n"
+                "2. 사용자가 강조한 '대체어'나 '목적어'를 중심으로 문장을 재구성하라.\n"
+                "3. 검색 쿼리에서 금지된 단어는 절대 포함하지 마라.\n"
 
                 "### 출력 형식 ###\n"
                 "연관성: [질문과 연관됨/새로운 주제 중 선택]\n"
@@ -312,12 +322,12 @@ def rewrite_question(question):
                 "입력: 거기 어떻게 가야 하지?\n"
                 "문장: 해당 장소 방문 방법 및 대중교통 오시는 길 안내\n"
                 "키워드: 방문 방법, 오시는 길, 교통편, 위치, 지도\n"
-                "출력은 반드시 문장:[검색에 최적화된 완성형 문장]\n키워드: [검색 필터로 사용할 핵심 명사들, 쉼표로 구분] 만 나오게 해줘"
+                "출력은 반드시 문장:[검색에 최적화된 완성형 문장]\n키워드: [검색 필터로 사용할 핵심 명사들, 쉼표로 구분] 만 나오게 해줘\n"
             )
         },
         {
             'role': 'user',
-            'content':  f"입력: {question}",
+            'content':  f"### [입력 데이터] ###\n {question}\n\n### [변환 결과] ###",
         },
        
     ],options={
@@ -445,8 +455,8 @@ def update_memory(user_id, user_query, assistant_answer):
     memory_store[user_id]['messages'].append({"role": "assistant", "content": assistant_answer})
     
     # 4. 뒤에서부터 3세트(6개 메시지)만 남기고 자르기
-    if len(memory_store[user_id]['messages']) > 14:
-        memory_store[user_id]['messages'] = memory_store[user_id]['messages'][-14:]
+    if len(memory_store[user_id]['messages']) > 10:
+        memory_store[user_id]['messages'] = memory_store[user_id]['messages'][-10:]
     
     # 마지막 활동 시간 갱신
     memory_store[user_id]['last_activity'] = now
@@ -456,15 +466,12 @@ def rewrite_talk_question(user_id,question):
     try:
         history = get_refined_context(user_id)
         history_text = "\n".join([f"{m['role']}: {m['content']}" for m in history])
-        print("###"*30)
-        print(history_text)
-    
         response = ollama_client.chat(model=OLLAMA_MODEL, messages=[
             {
                 "role": "system",
                 "content": (
                     "### 역할 ###\n"
-                    "너는 기존 대화내용과 사용자의 질문을 분석하여 '벡터 검색용 문장'과 '키워드 검색용 단어'로 변환하는 전문 쿼리 생성기이다.\n"
+                    "너는 사용자의 질문을 분석하여 '벡터 검색용 문장'과 '키워드 검색용 단어'로 변환하는 어린이집안전공제회 전문 쿼리 생성기이다.\n"
                     "지시사항: 지금부터 너는 인간의 말을 하는 AI가 아니라, 텍스트를 받으면'벡터 검색용 문장'과 '키워드 검색용 단어' 형태의 데이터만 뱉는 변환기이다. 인사말, 해설, 판단 근거를 출력하는 즉시 시스템 에러가 발생하므로 절대 출력하지 마라.\n"
                     
                     "### 핵심 원칙 ###\n"
@@ -479,6 +486,12 @@ def rewrite_talk_question(user_id,question):
                     "5. 질문이 완전히 독립적이라면(예: 갑자기 날씨를 묻거나 다른 기관을 묻는 경우), 이전 맥락을 섞지 마세요.\n"
                     "6. 질문에 없는 정보를 상상해서 추가하지 마라.\n"
                     "7. 출력은 반드시 아래 형식을 지켜라.\n"
+                    "8. 대화 내용을 그대로 질문으로 사용하지 말고 가공해서 사용하라.\n"
+                    
+                    "### 부정어 처리 규칙 ###\n"
+                    "1. 사용자가 '~말고', '~제외하고', '~아닌' 등의 표현을 쓰면, 해당 단어는 [검색 키워드]에서 완전히 제거하라.\n"
+                    "2. 사용자가 강조한 '대체어'나 '목적어'를 중심으로 문장을 재구성하라.\n"
+                    "3. 검색 쿼리에서 금지된 단어는 절대 포함하지 마라.\n"
 
                     "### 출력 형식 ###\n"
                     "연관성: [연관됨/새로운 주제 중 선택]\n"
