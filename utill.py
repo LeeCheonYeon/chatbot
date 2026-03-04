@@ -287,7 +287,7 @@ def ask_ollama(context_text: str, user_query:str):
        
     ],options={
             'temperature': 0,  # 일관된 답변을 위해 낮게 설정
-            'num_ctx': 4096,
+            'num_ctx': 8196,
             'seed': 42,
         })
     return response['message']['content']

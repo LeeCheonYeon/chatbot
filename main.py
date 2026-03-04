@@ -59,7 +59,7 @@ def run_consulting_system():
                 refined_data = utill.get_refined_context_rearrange(
                     query=refined_query, 
                     documents=refined_docs, 
-                    top_n=5, 
+                    top_n=3, 
                     min_score=0.01
                 )
 
