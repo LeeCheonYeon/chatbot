@@ -4,7 +4,6 @@ import traceback
 
 #나중에 세션아이디로 받아서 처리
 USER_ID = 'test'
-
 def run_consulting_system():
     """메인 루프"""
     
@@ -88,6 +87,7 @@ def run_consulting_system():
                     print(f"{len(context_text)} 길이")
                     #answer = utill.ask_ollama(context_text,user_query)
                     answer = utill.ask_ollama(context_text,vector_query)
+                    """ 로봇처럼 대답하기 위해 우선 주석
                     # 만약 답변에 '찾을 수 없습니다'가 포함되어 있다면, 그냥 문장 전체를 교체
                     if "정보를 찾을 수 없습니다" in answer:
                         print("###"*10)
@@ -103,7 +103,12 @@ def run_consulting_system():
                     print("-" * 40)
                     print(f"📢 상담관 답변:\n\n{answer}")
                     print("-" * 40)
-                    
+                    """
+                    full_text = "" # 전체 답변
+                    for chunk in answer:
+                        print(chunk, end='', flush=True) # 사용자에게 실시간 출력
+                        full_text += chunk
+                    utill.update_memory('test', user_query, full_text)
                 else:
                     answer = '질문에 대한 답변을 찾지 못하였습니다.'
                     #utill.update_memory('test', user_query, answer)
