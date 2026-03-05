@@ -304,13 +304,15 @@ def rewrite_question(question):
                  "지시사항: 지금부터 너는 인간의 말을 하는 AI가 아니라, 텍스트를 받으면'벡터 검색용 문장'과 '키워드 검색용 단어' 형태의 데이터만 뱉는 변환기이다. 판단 근거를 출력하는 즉시 시스템 에러가 발생하므로 절대 출력하지 마라.\n"
 
                 "### 절대 규칙 ###\n"
-                "1. 절대 사용자의 질문에 답하지 마라. (예: '~입니다', '~하세요' 금지)\n"
+                "1. 절대 사용자의 질문에 답하지 마라.\n"
                 "2. 반드시 질문에 없는 정보를 상상해서 추가하지 마라.\n"
-                "3. 출력은 반드시 아래 형식을 지켜라.\n"
+                "3. 변환 결과과 없을 경우 입력 데이터를 문장으로, 키워드는 입력 데이터에서 뽑아서 출력이 반드시 있게 하라.\n"
+                "4. 출력은 반드시 아래 형식을 지켜라.\n"
+                "5. 출력은 반드시 아래 형식외에 앞뒤로 특수문자는 절대로 붙이지 마라\n"
                 
                 "### 부정어 처리 규칙 ###\n"
                 
-                "1. 사용자가 '~말고', '~제외하고', '~아닌' 등의 표현을 쓰면, 해당 단어는 [검색 키워드]에서 완전히 제거하라.\n"
+                "1. 사용자가 '~말고', '~제외하고', '~아닌' 등의 표현을 쓰면, 해당 단어는 [키워드]에서 완전히 제거하라.\n"
                 "2. 사용자가 강조한 '대체어'나 '목적어'를 중심으로 문장을 재구성하라.\n"
                 "3. 검색 쿼리에서 금지된 단어는 절대 포함하지 마라.\n"
 
@@ -344,12 +346,17 @@ def rewrite_question(question):
     # 문장과 키워드 분리
     vector_query = ""
     keyword_list = ""
-    
+    print(content)
     for line in content.split('\n'):
-        if line.startswith("문장:"):
-            vector_query = line.replace("문장:", "").strip()
-        elif line.startswith("키워드:"):
-            keyword_list = line.replace("키워드:", "").strip()
+        line = line.strip() # 앞뒤 불필요한 공백 제거
+        if not line: continue
+        # '문장' 처리
+        if "문장" in line:
+            # 앞뒤의 모든 장식(특수문자/공백)을 날리고 알맹이(\1)만 남김
+            vector_query = re.sub(r"^[^\w\s]*\s*문장\s*:\s*(.*?)\s*[^\w\s]*$", r"\1", line).strip()
+        # '키워드' 처리
+        elif "키워드" in line:
+            keyword_list = re.sub(r"^[^\w\s]*\s*키워드\s*:\s*(.*?)\s*[^\w\s]*$", r"\1", line).strip()
     return vector_query, keyword_list
         
                
@@ -480,8 +487,8 @@ def rewrite_talk_question(user_id,question):
                     "사용자가 '거기', '그때', '그 내용' 등 '지시어'를 사용하지 않았다면, 대화 내용과는 완전히 다른 '새로운 주제'로 간주하고 마지막 질문만 독립적으로 변환한다.\n" "대화 내용에 매몰되지 마라.\n"
                     "절대 대화 내용을 답변으로 내뱉지 마라. 오직 검색용 문장과 키워드만 생성하라.\n"
     
-                    "### 규칙 ###\n"
-                    "1. 절대 사용자의 질문에 답하지 마라. (예: '~입니다', '~하세요' 금지)\n"
+                    "### 절대 규칙 ###\n"
+                    "1. 절대 사용자의 질문에 답하지 마라.\n"
                     "2. 결과물에 '관련이 없습니다', '무시합니다' 같은 해설을 절대 포함하지 마라.\n"
                     "3. 만약 마지막 질문이 대화 내용과 관계없는 '새로운 주제'라면, 대화 내용을 무시하고 마지막 질문만으로 검색 데이터를 만드세요.\n"
                     "4. 질문 내에 '거기', '그분', '그때' 같은 지시어가 있는 경우에만 대화 내용을 참조하여 구체적인 명사로 치환하세요.\n"
@@ -489,6 +496,8 @@ def rewrite_talk_question(user_id,question):
                     "6. 질문에 없는 정보를 상상해서 추가하지 마라.\n"
                     "7. 출력은 반드시 아래 형식을 지켜라.\n"
                     "8. 대화 내용을 그대로 질문으로 사용하지 말고 가공해서 사용하라.\n"
+                    "9. 변환 결과과 없을 경우 마지막 질문을 문장으로, 키워드는 마지막 질문에서 뽑아서 출력이 반드시 있게 하라.\n"
+                    "10. 출력은 반드시 아래 형식외에 앞뒤로 특수문자는 절대로 붙이지 마라.\n"
                     
                     "### 부정어 처리 규칙 ###\n"
                     "1. 사용자가 '~말고', '~제외하고', '~아닌' 등의 표현을 쓰면, 해당 단어는 [검색 키워드]에서 완전히 제거하라.\n"
@@ -533,10 +542,15 @@ def rewrite_talk_question(user_id,question):
         keyword_list = ""
         
         for line in content.split('\n'):
-            if line.startswith("문장:"):
-                vector_query = line.replace("문장:", "").strip()
-            elif line.startswith("키워드:"):
-                keyword_list = line.replace("키워드:", "").strip()
+            line = line.strip() # 앞뒤 불필요한 공백 제거
+            if not line: continue
+            # '문장' 처리
+            if "문장" in line:
+                # 앞뒤의 모든 장식(특수문자/공백)을 날리고 알맹이(\1)만 남김
+                vector_query = re.sub(r"^[^\w\s]*\s*문장\s*:\s*(.*?)\s*[^\w\s]*$", r"\1", line).strip()
+            # '키워드' 처리
+            elif "키워드" in line:
+                keyword_list = re.sub(r"^[^\w\s]*\s*키워드\s*:\s*(.*?)\s*[^\w\s]*$", r"\1", line).strip()
     except Exception as e:
         print(f"❌ 질문 재생성 실패: {e}")
     return vector_query, keyword_list

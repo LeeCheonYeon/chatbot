@@ -85,7 +85,9 @@ def run_consulting_system():
                 if context_text:
                     # 5. Ollama 답변 생성 (최종 단계)
                     print("✍️ 답변을 생성하는 중입니다. 잠시만 기다려 주세요...\n")
-                    answer = utill.ask_ollama(context_text,user_query)
+                    print(f"{len(context_text)} 길이")
+                    #answer = utill.ask_ollama(context_text,user_query)
+                    answer = utill.ask_ollama(context_text,vector_query)
                     # 만약 답변에 '찾을 수 없습니다'가 포함되어 있다면, 그냥 문장 전체를 교체
                     if "정보를 찾을 수 없습니다" in answer:
                         print("###"*10)
