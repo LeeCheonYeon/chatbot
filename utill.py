@@ -458,8 +458,32 @@ def remove_tag_text(raw_html: str) -> str:
     soup = BeautifulSoup(raw_html, "lxml")
     
     # 본문과 상관없는 태그(스크립트, 스타일, 주석 등)는 아예 삭제
-    for extra in soup(["script", "style", "header", "footer", "nav"]):
+    for extra in soup(["script", "style", "header", "footer", "nav", "meta", "iframe"]):
         extra.decompose()
+    
+    # 표(table)를 마크다운 형식의 텍스트로 치환
+    for table in soup.find_all('table'):
+        markdown_table = []
+        rows = table.find_all('tr')
+        
+        for row in rows:
+            # th와 td를 모두 찾아서 리스트로 만듦
+            cells = row.find_all(['th', 'td'])
+            cell_texts = [cell.get_text(strip=True).replace('\n', ' ') for cell in cells]
+            
+            # 마크다운 표 형식 생성: | 셀1 | 셀2 |
+            if cell_texts:
+                markdown_table.append("| " + " | ".join(cell_texts) + " |")
+        
+        # 표의 헤더와 본문 사이 구분선 추가 (최소 1행이라도 있을 때)
+        if len(markdown_table) > 0:
+            header_line = "| " + " | ".join(['---'] * len(rows[0].find_all(['th', 'td']))) + " |"
+            if len(markdown_table) > 1:
+                markdown_table.insert(1, header_line)
+        
+        # 완성된 마크다운 표를 텍스트로 변환하여 기존 table 태그와 교체
+        table_as_text = "\n\n" + "\n".join(markdown_table) + "\n\n"
+        table.replace_with(table_as_text)
         
     # 모든 링크(<a> 태그)를 찾아 "텍스트(URL)" 형태로 변환
     for a in soup.find_all('a'):
