@@ -29,16 +29,12 @@ def run_consulting_system():
         check_follow_up = utill.check_is_follow_up(user_query)
         user_query = utill.remove_tag_text(user_query)
         vector_query = ""
-        """
         if check_follow_up and old_talk :
             #ollama를 통해서 질문을 검색용 문장 및 키워드로 변경
             vector_query, keyword_list = utill.rewrite_talk_question(USER_ID,user_query)
         else:
             keyword_list = utill.rewrite_question_keyword(user_query)
             vector_query = user_query
-        """
-        keyword_list = utill.rewrite_question_keyword(user_query)
-        vector_query = user_query
         print("="*60)
         print(keyword_list)
         if keyword_list:
@@ -46,7 +42,7 @@ def run_consulting_system():
                 # 2. Qdrant 벡터 검색 (1단계: 관련 문서 후보 5개 추출)
                 print("🔍 관련 자료를 검색하고 있습니다...")
                 user_query_emb = utill.get_embedding(vector_query)
-                initial_docs = utill.search_collection_data_hybrid("test_cylee","full_contents",user_query_emb,keyword_list, 5)
+                initial_docs = utill.search_collection_data_hybrid("test_cylee2","full_contents",user_query_emb,keyword_list, 5)
                 if not initial_docs:
                     print("⚠️ 검색된 기본 자료가 없습니다.")
                     continue
