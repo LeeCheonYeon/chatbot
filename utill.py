@@ -823,3 +823,20 @@ def rewrite_question_keyword2(question):
         if "키워드" in line:
             keyword_list = re.sub(r"^[^\w\s]*\s*키워드\s*:\s*(.*?)\s*[^\w\s]*$", r"\1", line).strip()
     return keyword_list
+
+def rewrite_query_with_history(user_id, current_query):
+    # chat_history는 이전 대화 리스트
+    history = get_refined_context(user_id)
+    history_text = "\n".join([f"{m['role']}: {m['content']}" for m in history])
+    prompt = f"""
+    이전 대화 내용을 바탕으로 사용자의 마지막 질문을 '단독으로 검색 가능한 문장'으로 다시 작성하세요.
+    
+    대화 이력: {history_text}
+    마지막 질문: {current_query}
+    
+    반드시 질문만 출력하세요. 
+    절대 질문에 대한 답변을 하지마세요.
+    다시 작성된 질문의 내용은 질문만 있고 어떻게 해서 질문이 나왔는지는 절대 포함되면 안됩니다.
+    """
+    response = ollama_client.chat(model=OLLAMA_MODEL, messages=[{'role': 'user', 'content': prompt}])
+    return response['message']['content']

@@ -60,7 +60,10 @@ def run_consulting_system():
                 # 3. 리랭커 필터링 (2단계: 점수 0.5 이상, 상위 3개 정밀 선별)
                 # 이제 이 함수가 텍스트까지 포함된 리스트를 반환합니다.
                 print("🎯 자료의 정확도를 분석 중입니다...")
-                refined_query =  f"{vector_query} {keyword_list}"
+                if check_follow_up and old_talk : 
+                   refined_query = utill.rewrite_query_with_history(USER_ID,user_query)
+                else :
+                   refined_query =  f"{vector_query} {keyword_list}"
                 print(refined_query)
                 refined_data = utill.get_refined_context_rearrange(
                     query=refined_query, 
@@ -70,7 +73,7 @@ def run_consulting_system():
                 )
 
                 # 4. 컨텍스트 구성
-                if not refined_data:
+                if not refined_data and not check_follow_up and  not old_talk:
                     # 검색은 됐으나 점수가 너무 낮아 신뢰할 수 없는 경우
                     context_text = "" 
                     print("💡 참고할 만한 충분한 점수의 자료를 찾지 못했습니다.")
@@ -85,7 +88,7 @@ def run_consulting_system():
                         scores = [f"{item['score']:.2f}" for item in refined_data]
                         print(f"참고 자료 신뢰도: {', '.join(scores)}")
                     
-                if context_text:
+                if context_text or (check_follow_up and old_talk):
                     # 5. Ollama 답변 생성 (최종 단계)
                     print("✍️ 답변을 생성하는 중입니다. 잠시만 기다려 주세요...\n")
                     print(f"{len(context_text)} 길이")
