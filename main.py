@@ -63,7 +63,7 @@ def run_consulting_system():
                 if check_follow_up and old_talk : 
                    refined_query = utill.rewrite_query_with_history(USER_ID,user_query)
                 else :
-                   refined_query =  f"{vector_query} {keyword_list}"
+                   refined_query =  f"{vector_query}({keyword_list})"
                 print(refined_query)
                 refined_data = utill.get_refined_context_rearrange(
                     query=refined_query, 
