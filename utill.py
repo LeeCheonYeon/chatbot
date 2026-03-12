@@ -458,7 +458,7 @@ def remove_tag_text(raw_html: str) -> str:
     soup = BeautifulSoup(raw_html, "lxml")
     
     # 본문과 상관없는 태그(스크립트, 스타일, 주석 등)는 아예 삭제
-    for extra in soup(["script", "style", "header", "footer", "nav", "meta", "iframe"]):
+    for extra in soup(["script", "style", "header", "footer", "nav"]):
         extra.decompose()
         
     # 모든 링크(<a> 태그)를 찾아 "텍스트(URL)" 형태로 변환

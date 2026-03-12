@@ -79,7 +79,7 @@ def run_consulting_system():
                     # 검색된 텍스트들을 하나로 합침
                     context_text = "\n".join([initial_docs.points[item['index']].payload['full_contents'] for item in refined_data])
                     print(f"✅ {len(refined_data)}개의 핵심 근거를 찾았습니다.")
-
+                    context_text = utill.remove_tag_text(context_text)
                     # (선택 사항) 디버깅용 점수 출력
                     if refined_data:
                         scores = [f"{item['score']:.2f}" for item in refined_data]
