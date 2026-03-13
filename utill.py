@@ -13,7 +13,9 @@ import hashlib
 import pymysql
 import time
 import html
-
+""" 설치
+    pip install requests beautifulsoup4 qdrant-client langchain-text-splitters ollama pymysql
+"""
 """설정 시작"""
 EMBEDDING_URL = "http://localhost:7001/v1/embeddings"
 EMBEDDING_MODEL = "BAAI/bge-m3"
