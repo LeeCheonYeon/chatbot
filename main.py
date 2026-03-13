@@ -69,7 +69,7 @@ def run_consulting_system():
                     query=refined_query, 
                     documents=refined_docs, 
                     top_n=2, 
-                    min_score=0.05
+                    min_score=0.01
                 )
 
                 # 4. 컨텍스트 구성
