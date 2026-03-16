@@ -54,7 +54,7 @@ def run_consulting_system():
                     print(f"ID: {point.id}, Score: {point.score}")
                 print(f"{len(initial_docs.points)} 개의 참고자료")
 
-                refined_docs = [point.payload.get("text", "") for point in initial_docs.points]
+                refined_docs = [point.payload.get("rerank_chunk", "") for point in initial_docs.points]
                 print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"*3)
                 print(refined_docs)
                 # 3. 리랭커 필터링 (2단계: 점수 0.5 이상, 상위 3개 정밀 선별)

@@ -183,8 +183,28 @@ def trans_list_to_pointStructList(documents:List = [], type:str = 'A') -> List[m
             full_text = f"{content}"
             full_text = html.unescape(full_text)
             bf_text = remove_tag_text(full_text)
+            """
             chunks = split_text(title,bf_text)
             for ii, chunk in enumerate(chunks):
+                chunk_index = f"{i}_{ii}"
+                id = make_chunk_id(post_id, chunk_index, chunk)
+                vector = get_embedding(chunk)
+                #keyword = process_chunk(chunk)
+                #print("===="*30)
+                #print(keyword)
+                #print("===="*30)
+                #result_text = f"{keyword} {chunk}"
+                # 실제 텍스트 문장을 함께 보관 
+                points.append(models.PointStruct( id=id, vector=vector, payload={ "post_id": post_id,
+                    "chunk_index": ii,
+                    "text": chunk,
+                    "full_contents":full_text,
+                    "updated_at": str(doc["REG_DATE"])} ))
+            """
+            chunks = split_text2(title,bf_text)
+            for ii, ch in enumerate(chunks):
+                chunk = ch.get('chunk')
+                rerank_chunk = ch.get('rerank_chunk')
                 chunk_index = f"{i}_{ii}"
                 id = make_chunk_id(post_id, chunk_index, chunk)
                 vector = get_embedding(chunk)
@@ -192,6 +212,7 @@ def trans_list_to_pointStructList(documents:List = [], type:str = 'A') -> List[m
                 points.append(models.PointStruct( id=id, vector=vector, payload={ "post_id": post_id,
                     "chunk_index": ii,
                     "text": chunk,
+                    "rerank_chunk":rerank_chunk,
                     "full_contents":full_text,
                     "updated_at": str(doc["REG_DATE"])} ))
     return points
@@ -241,7 +262,22 @@ def search_collection_data_hybrid(collection_nm: str = COLLECTION_NAME, field_nm
             score_threshold=0.5,
             limit=limit_count  # 전달할 최종 후보군 개수
         )
-    return search_result
+        # 2. 결과 리스트(points)만 뽑아서 'updated_at' 기준으로 정렬합니다.
+        # raw_result.points가 실제 데이터 리스트입니다.
+        sorted_points = sorted(
+            search_result.points, 
+            key=lambda x: x.payload.get('updated_at', 0) if x.payload else 0, 
+            reverse=True
+        )
+
+        # 3. [핵심] 기존 query_points 결과와 동일한 구조로 다시 포장합니다.
+        # 기존의 'search_result' 변수 구조와 똑같아집니다.
+        search_res = models.QueryResponse(
+            points=sorted_points[:limit_count] # 최신순 정렬된 상위 N개만 담음
+        )
+
+        # 이제 함수 밖에서 search_result.points를 호출해도 에러 없이 작동합니다!
+        return search_res
 
 #리랭커로 순위 정렬
 def get_rerank(query: str, documents: List[str]) -> List[Dict[str, Any]]:
@@ -313,6 +349,8 @@ def ask_ollama(context_text: str, user_query:str):
                     "10. 출력 단계 (성공): 맞춤법, 한글 문법에 맞게 답변한다.\n"
                     "11. 출력 단계 (실패): 자료에 직접적인 정보가 없거나, 질문이 자료와 관련 없다면 오직 '정보를 찾을 수 없습니다.' 한 문장만 출력한다.\n"
                     "12. 데이터를 분석해서 답변을 해야한다. 절대 데이터를 짜집기 하지 마라\n"
+                    "13. 답변을 짜집기해서 만들지 마세요.\n"
+                    "14. 한문은 한글로 번역해서 답변해주세요.\n"
             )
             },
             {
@@ -358,6 +396,8 @@ def ask_ollama_follow(context_text: str, user_query:str, talk:str):
                     "10. 출력 단계 (성공): 맞춤법, 한글 문법에 맞게 답변한다.\n"
                     "11. 출력 단계 (실패): 자료에 직접적인 정보가 없거나, 질문이 자료와 관련 없다면 오직 '정보를 찾을 수 없습니다.' 한 문장만 출력한다.\n"
                     "12. 데이터를 분석해서 답변을 해야한다. 절대 데이터를 짜집기 하지 마라\n"
+                    "13. 답변을 짜집기해서 만들지 마세요.\n"
+                    "14. 한문은 한글로 번역해서 답변해주세요.\n"
             )
             },
             {
@@ -526,6 +566,37 @@ def split_text(title:str, text: str) -> List[str]:
             #문장 병합
             chunks.append(cleaned)
 
+    return chunks
+
+# 문장 분리 , 문장클리닝 및 필터링, 문장병합
+def split_text2(title:str, text: str) -> List[str]:
+    #문장 분리
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=400,
+        chunk_overlap=100,
+        separators=["\n\n", "\n", ". ", "? ", "! ", " ", ""]
+    )
+
+    # 2. 텍스트 분할
+    docs = splitter.split_text(text)
+    
+    chunks = []
+    
+    for i in range(len(docs)):
+        current = docs[i]
+        
+        # 앞뒤 컨텍스트 가져오기 (각 250자 내외로 제한하여 합계 900자 미만 유지)
+        prev_context = docs[i-1][-250:] if i > 0 else ""
+        next_context = docs[i+1][:250] if i < len(docs) - 1 else ""
+        
+        # 리랭커가 "가운데"가 핵심임을 알 수 있게 가공
+        # 1,000자 이내로 밀도 높게 구성
+        rerank_context = f"[PREV] {prev_context}\n[MAIN] {title} \n {current}\n[NEXT] {next_context}"
+        
+        chunks.append({
+            "chunk": f"{title} \n {current}",      # 벡터 임베딩용
+            "rerank_chunk": rerank_context,  # 리랭커 입력용
+        })
     return chunks
 
 # 1. 서버 메모리 저장소 (유저별 대화와 마지막 활동 시간 저장)
@@ -839,6 +910,22 @@ def rewrite_query_with_history(user_id, current_query):
     반드시 질문만 출력하세요. 
     절대 질문에 대한 답변을 하지마세요.
     다시 작성된 질문의 내용은 질문만 있고 어떻게 해서 질문이 나왔는지는 절대 포함되면 안됩니다.
+    마지막 질문을 중심으로 질문을 출력하세요.
     """
     response = ollama_client.chat(model=OLLAMA_MODEL, messages=[{'role': 'user', 'content': prompt}])
     return response['message']['content']
+
+def process_chunk(chunk, org_name="광주광역시도시공사"):
+    prompt = f"""
+    문서 조각을 보고 검색 성능을 높이기 위한 요약과 핵심 키워드 3개만 뽑으세요.
+    주어가 없다면 반드시 '{org_name}'을 포함하세요.
+    출력 형식: [요약], [키워드1, 키워드2, 키워드3] (설명 없이 단어만)
+    문서: {chunk[:500]} # 토큰 절약을 위해 앞부분만 전달
+    """
+    try:
+        response = ollama_client.generate(model=OLLAMA_MODEL, prompt=prompt, options={'temperature': 0})
+        keywords = response['response'].strip()
+        return keywords
+    except Exception as e:
+        print(f"Ollama 에러: {e}")
+        return f"[{org_name}]" # 에러 시 기본 기관명이라도 반환
