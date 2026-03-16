@@ -9,6 +9,8 @@ from ollama import Client
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
 
+import html2text
+
 import hashlib
 import pymysql
 import time
@@ -931,3 +933,82 @@ def process_chunk(chunk, org_name="광주광역시도시공사"):
     except Exception as e:
         print(f"Ollama 에러: {e}")
         return f"[{org_name}]" # 에러 시 기본 기관명이라도 반환
+
+def normalize_table_merged_cells(html_content):
+    soup = BeautifulSoup(html_content, 'lxml')
+    tables = soup.find_all('table')
+    
+    for table in tables:
+        rows = table.find_all('tr')
+        if not rows: continue
+        
+        # 1. 실제 표의 최대 행/열 크기 파악
+        num_rows = len(rows)
+        num_cols = 0
+        for row in rows:
+            cells = row.find_all(['td', 'th'])
+            count = sum(int(c.get('colspan', 1)) for c in cells)
+            num_cols = max(num_cols, count)
+            
+        # 2. 가상의 그리드(2차원 배열) 생성
+        grid = [[None for _ in range(num_cols)] for _ in range(num_rows)]
+        
+        # 3. 그리드를 돌며 병합된 셀 내용 복제
+        for r_idx, row in enumerate(rows):
+            cells = row.find_all(['td', 'th'])
+            c_idx = 0
+            for cell in cells:
+                # 이미 rowspan 등에 의해 채워진 칸 건너뛰기
+                while c_idx < num_cols and grid[r_idx][c_idx] is not None:
+                    c_idx += 1
+                
+                if c_idx >= num_cols: break
+                
+                content = cell.get_text(strip=True)
+                rowspan = int(cell.get('rowspan', 1))
+                colspan = int(cell.get('colspan', 1))
+                
+                # 병합된 범위만큼 내용 채우기 (정규화)
+                for r_offset in range(rowspan):
+                    for c_offset in range(colspan):
+                        if r_idx + r_offset < num_rows and c_idx + c_offset < num_cols:
+                            grid[r_idx + r_offset][c_idx + c_offset] = content
+                c_idx += colspan
+        
+        # 4. 기존 HTML table 내부를 정규화된 데이터로 재구성
+        table.clear() # 기존 내용 비우기
+        for r_data in grid:
+            new_tr = soup.new_tag('tr')
+            for c_data in r_data:
+                new_td = soup.new_tag('td')
+                new_td.string = c_data if c_data else ""
+                new_tr.append(new_td)
+            table.append(new_tr)
+            
+    return str(soup)
+
+def process_to_markdown(raw_html):
+    # [1] JSP 지시어 및 주석 먼저 제거 (HTML 파싱 방해 요소 제거)
+    raw_html = re.sub(r'<%.*?%>', '', raw_html, flags=re.DOTALL)
+    raw_html = re.sub(r'', '', raw_html, flags=re.DOTALL)
+    
+    # [2] BeautifulSoup으로 노이즈 태그 제거
+    soup = BeautifulSoup(raw_html, "lxml")
+    for extra in soup(["script", "style", "header", "footer", "nav", "iframe"]):
+        extra.decompose()
+
+    # [3] 마크다운 변환 (soup을 다시 문자열로 바꿔서 전달)
+    h = html2text.HTML2Text()
+    h.ignore_links = False
+    h.body_width = 0  # 줄바꿈 방지
+    
+    # soup.decode()를 써서 정제된 HTML 상태로 변환기에 넘깁니다.
+    markdown_text = h.handle(str(soup))
+
+    # [4] 최종 마크다운 텍스트에서 비인쇄 문자 및 불필요한 공백 제거
+    # HWP 제어 문자 등 비인쇄 문자 제거
+    markdown_text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', markdown_text)
+    # 너무 많은 줄바꿈 정리 (3개 이상을 2개로)
+    markdown_text = re.sub(r'\n{3,}', '\n\n', markdown_text)
+    
+    return markdown_text.strip()
