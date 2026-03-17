@@ -25,7 +25,6 @@ def run_consulting_system():
             continue
         
         old_talk = utill.get_refined_context(USER_ID)
-        print(old_talk)
         check_follow_up = utill.check_is_follow_up(user_query)
         user_query = utill.remove_tag_text(user_query)
         vector_query = ""
@@ -43,8 +42,9 @@ def run_consulting_system():
         if check_follow_up and old_talk :
             #ollama를 통해서 질문을 검색용 문장 및 키워드로 변경
             vector_query = utill.rewrite_query_with_history(USER_ID,user_query)
+            print("*****************"*20)
+            print(vector_query)
         print("="*60)
-        print(vector_query)
         print(keyword_list)
         if keyword_list:
             try:
@@ -100,7 +100,8 @@ def run_consulting_system():
                     print("✍️ 답변을 생성하는 중입니다. 잠시만 기다려 주세요...\n")
                     print(f"{len(context_text)} 길이")
                     if check_follow_up and old_talk :
-                        answer = utill.ask_ollama_follow(context_text,vector_query,old_talk)
+                        old_talk_ = "\n".join([item['context'] for item in old_talk])
+                        answer = utill.ask_ollama_follow(context_text,vector_query,old_talk_)
                     else:
                         answer = utill.ask_ollama(context_text,vector_query)
                     full_text = "" # 전체 답변

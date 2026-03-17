@@ -608,7 +608,7 @@ def split_text2(title:str, text: str) -> List[str]:
 # 1. 서버 메모리 저장소 (유저별 대화와 마지막 활동 시간 저장)
 # { "user_id": { "messages": [...], "last_activity": datetime } }
 memory_store = {}
-
+"""
 def get_refined_context(user_id):
     now = datetime.now()
     
@@ -654,12 +654,65 @@ def get_refined_context(user_id):
 
     # 4. LLM 전달을 위해 다시 원래 시간 순서대로 정렬
     top_pairs.sort(key=lambda x: x['index'])
-    print(top_pairs)
     # 5. 최종 리스트 생성
     refined_messages = []
     for pair in top_pairs:
         refined_messages.extend(pair['items'])
+    return refined_messages
+"""
 
+def get_refined_context(user_id):
+    now = datetime.now()
+    if user_id not in memory_store:
+        return []
+    
+    user_data = memory_store[user_id]
+    
+    # 30분 제한 체크
+    if now - user_data['last_activity'] > timedelta(minutes=30):
+        memory_store[user_id] = {"messages": [], "last_activity": now}
+        return []
+    
+    messages = user_data['messages']
+    if not messages:
+        return []
+
+    scored_pairs = []
+    total_pairs = len(messages) // 2
+    
+    for i in range(0, len(messages), 2):
+        if i + 1 < len(messages):
+            pair_index = i // 2
+            # 점수 계산 (최신일수록 1.0에 수렴)
+            recency_score = round((pair_index + 1) / total_pairs, 2)
+            
+            scored_pairs.append({
+                "score": recency_score,
+                "index": i,
+                "items": [messages[i], messages[i+1]]
+            })
+
+    # 최신 점수 상위 3세트 추출
+    scored_pairs.sort(key=lambda x: x['score'], reverse=True)
+    top_pairs = scored_pairs[:3]
+
+    # 시간 순서로 재정렬
+    top_pairs.sort(key=lambda x: x['index'])
+
+    refined_messages = []
+    for pair in top_pairs:
+        score = pair['score']
+        user_msg = pair['items'][0]['content']
+        assistant_msg = pair['items'][1]['content']
+        
+        # 질문과 답변을 하나의 문자열로 결합
+        combined_content = f"[점수: {score}] 질문: {user_msg} / 답변: {assistant_msg}"
+        
+        # 하나의 딕셔너리로 저장
+        refined_messages.append({
+            "context": combined_content
+        })
+            
     return refined_messages
 
 def update_memory(user_id, user_query, assistant_answer):
@@ -673,8 +726,8 @@ def update_memory(user_id, user_query, assistant_answer):
     memory_store[user_id]['messages'].append({"role": "assistant", "content": assistant_answer})
     
     # 4. 뒤에서부터 3세트(6개 메시지)만 남기고 자르기
-    if len(memory_store[user_id]['messages']) > 10:
-        memory_store[user_id]['messages'] = memory_store[user_id]['messages'][-10:]
+    if len(memory_store[user_id]['messages']) > 6:
+        memory_store[user_id]['messages'] = memory_store[user_id]['messages'][-6:]
     
     # 마지막 활동 시간 갱신
     memory_store[user_id]['last_activity'] = now
@@ -683,7 +736,7 @@ def update_memory(user_id, user_query, assistant_answer):
 def rewrite_talk_question(user_id,question):
     try:
         history = get_refined_context(user_id)
-        history_text = "\n".join([f"{m['role']}: {m['content']}" for m in history])
+        history_text = "\n".join([item['context'] for item in history])
         response = ollama_client.chat(model=OLLAMA_MODEL, messages=[
             {
                 "role": "system",
@@ -830,7 +883,7 @@ def rewrite_question_keyword(question):
 def check_is_follow_up(user_input):
     # 1. 재질문 핵심 키워드 패턴 (지시어, 이유, 대조 등)
     follow_up_patterns = [
-        r"(그거|그것|그게|그건|거기|그때|이중|저번|방금|이전|아까|다시|그런데|전에|그곳|저곳|이곳|거기서)", # 지시어
+        r"(그거|그것|그게|그건|거기|그때|이중|저번|방금|이전|아까|다시|그런데|전에|그곳|저곳|이곳|거기서|어떻게)", # 지시어
         r"^(그|이|왜|어째서|이유가|근거가|진짜|정말|확실해|맞아|근데|그럼)",     # 이유 및 확인 (문장 시작)
         r"(더|추가로|자세히|상세히|구체적으로|해당|말한|그사람|이사람)",           # 상세 설명 요청
         r"(다른|대신|말고|아니면|차이|비교)"              # 대안 및 비교
@@ -912,22 +965,34 @@ def rewrite_question_keyword2(question):
 def rewrite_query_with_history(user_id, current_query):
     # chat_history는 이전 대화 리스트
     history = get_refined_context(user_id)
-    history_text = "\n".join([f"{m['role']}: {m['content']}" for m in history])
-    prompt = f"""
-    [ 이전대화] 과 [마지막 질문]을 바탕으로 '단독으로 검색 가능한 문장'으로 다시 작성하세요.
-    
-    이전대화: {history_text}
-    마지막 질문: {current_query}
-    
-    [마지막 질문]을 분석하여 [이전대화]과 관련된 질문을 정리해서 출력하세요.
-    반드시 질문만 출력하세요. 
-    절대 [이전대화]에 있는 질문을 그대로 출력하지 마세요.
-    절대 질문에 대한 답변을 하지마세요.
-    다시 작성된 질문의 내용은 질문만 있고 어떻게 해서 질문이 나왔는지는 절대 포함되면 안됩니다.
-    [이전대화]과 관련없으면 [마지막 질문]을 출력하세요.
-    한 문장만 출력하세요.
-    """
-    response = ollama_client.chat(model=OLLAMA_MODEL, messages=[{'role': 'user', 'content': prompt}],options={'temperature': 0, 'seed': 42})
+    history_text = "\n".join([item['context'] for item in history])
+    response = ollama_client.chat(model=OLLAMA_MODEL, messages=[
+        {
+            "role": "system",
+            "content": (
+                "### 역할 ###\n"
+                "너는 사용자의 질문[마지막 질문]과 이전대화[대화 내용]을 분석하여 '단독으로 검색 가능한 질문'으로 변환하는 '광주광역시도시공사' 전문 쿼리 생성기이다.\n\n"
+        
+                "### 절대 규칙 ###\n"
+                "1. 절대 [마지막 질문]에 답변하지 마라.\n"
+                "2. 반드시 질문에 없는 정보를 상상해서 추가하지 마라.\n"
+                "3. [이전대화]의 점수는 최신 일수록 높습니다 점수가 높을수록 더 많은 가중치를 주세요.\n"
+                "4. 출력은 앞뒤로 특수문자는 절대로 붙이지 마라\n"
+                "5. [이전대화]와 관련없으면 [마지막 질문]을 출력하세요.\n"
+                "6. 출력은 반드시 아래 형식을 지켜라.\n"
+                "7. 질문만 출력하라.\n"
+                "8. [마지막 질문]이 제일 중요하다.\n"
+                "9. 한 문장으로 질문을 만들어라.\n"
+                
+                "### 출력 형식 ###\n"
+                "[만든 질문]"
+            )
+        },
+        {
+            'role': 'user',
+            'content':  f" 이전대화: {history_text} \n\n 마지막 질문: {current_query}\n\n ### [변환 결과] ###",
+        },
+        ],options={'temperature': 0, 'seed': 42})
     return response['message']['content']
 
 def process_chunk(chunk, org_name="광주광역시도시공사"):
