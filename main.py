@@ -40,6 +40,7 @@ def run_consulting_system():
         keyword_list = utill.rewrite_question_keyword(user_query)
         vector_query = user_query
         print("="*60)
+        print(vector_query)
         print(keyword_list)
         if keyword_list:
             try:
