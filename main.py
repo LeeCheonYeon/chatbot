@@ -39,6 +39,10 @@ def run_consulting_system():
         """
         keyword_list = utill.rewrite_question_keyword(user_query)
         vector_query = user_query
+        refined_query = ""
+        if check_follow_up and old_talk :
+            #ollama를 통해서 질문을 검색용 문장 및 키워드로 변경
+            vector_query = utill.rewrite_query_with_history(USER_ID,user_query)
         print("="*60)
         print(vector_query)
         print(keyword_list)
