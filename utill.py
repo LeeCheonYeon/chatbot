@@ -927,7 +927,7 @@ def rewrite_query_with_history(user_id, current_query):
     [이전대화]과 관련없으면 [마지막 질문]을 출력하세요.
     한 문장만 출력하세요.
     """
-    response = ollama_client.chat(model=OLLAMA_MODEL, messages=[{'role': 'user', 'content': prompt}])
+    response = ollama_client.chat(model=OLLAMA_MODEL, messages=[{'role': 'user', 'content': prompt}],options={'temperature': 0, 'seed': 42})
     return response['message']['content']
 
 def process_chunk(chunk, org_name="광주광역시도시공사"):
@@ -938,7 +938,7 @@ def process_chunk(chunk, org_name="광주광역시도시공사"):
     문서: {chunk[:500]} # 토큰 절약을 위해 앞부분만 전달
     """
     try:
-        response = ollama_client.generate(model=OLLAMA_MODEL, prompt=prompt, options={'temperature': 0})
+        response = ollama_client.generate(model=OLLAMA_MODEL, prompt=prompt, options={'temperature': 0, 'seed': 42})
         keywords = response['response'].strip()
         return keywords
     except Exception as e:
