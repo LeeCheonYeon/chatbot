@@ -377,6 +377,7 @@ def ask_ollama(context_text: str, user_query:str):
         yield content
 
 def ask_ollama_follow(context_text: str, user_query:str, talk:str):
+    today = datetime.now().strftime("%Y년 %m월 %d일")
     # Ollama에게 보낼 최종 메시지 구조
     final_prompt = f"""[대화 내용]\n
                 {talk}\n
@@ -410,6 +411,7 @@ def ask_ollama_follow(context_text: str, user_query:str, talk:str):
                     "- 인사와 본인이 누군지 말하지 마라.\n"
                     "- 문법에 맞게 답변하세요.\n"
                     "- 같은 내용을 반복해서 말하지 마세요.\n"
+                    f"- 오늘 날짜는 {today}입니다. 모든 시간 질문은 이 날짜를 기준으로 답변하세요."
             )
             },
             {
@@ -889,7 +891,7 @@ def check_is_follow_up(user_input):
     # 1. 재질문 핵심 키워드 패턴 (지시어, 이유, 대조 등)
     follow_up_patterns = [
         r"(그거|그것|그게|그건|거기|그때|이중|저번|방금|이전|아까|다시|그런데|전에|그곳|저곳|이곳|거기서|지금)", # 지시어
-        r"^(그|이|왜|어째서|이유가|근거가|진짜|정말|확실해|맞아|근데|그럼)",     # 이유 및 확인 (문장 시작)
+        r"^(왜|어째서|이유가|근거가|진짜|정말|확실해|맞아|근데|그럼)",     # 이유 및 확인 (문장 시작)
         r"(더|추가로|자세히|상세히|구체적으로|해당|말한|그사람|이사람)",           # 상세 설명 요청
         r"(다른|대신|말고|아니면|차이|비교)"              # 대안 및 비교
     ]
@@ -971,6 +973,7 @@ def rewrite_query_with_history(user_id, current_query):
     # chat_history는 이전 대화 리스트
     history = get_refined_context(user_id)
     history_text = "\n".join([item['context'] for item in history])
+    today = datetime.now().strftime("%Y년 %m월 %d일")
     response = ollama_client.chat(model=OLLAMA_MODEL, messages=[
         {
             "role": "system",
@@ -988,6 +991,7 @@ def rewrite_query_with_history(user_id, current_query):
                 "- 질문만 출력하라.\n"
                 "- [마지막 질문]이 제일 중요하다.\n"
                 "- 한 문장으로 질문을 만들어라.\n"
+                f"- 오늘 날짜는 {today}입니다. 모든 시간 질문은 이 날짜를 기준으로 답변하세요."
                 
                 "### 출력 형식 ###\n"
                 "[만든 질문]"
