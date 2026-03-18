@@ -42,8 +42,7 @@ def run_consulting_system():
         if check_follow_up and old_talk :
             #ollama를 통해서 질문을 검색용 문장 및 키워드로 변경
             vector_query = utill.rewrite_query_with_history(USER_ID,user_query)
-            print("*****************"*20)
-            print(vector_query)
+            refined_query = vector_query
         print("="*60)
         print(keyword_list)
         if keyword_list:
@@ -65,9 +64,7 @@ def run_consulting_system():
                 # 3. 리랭커 필터링 (2단계: 점수 0.5 이상, 상위 3개 정밀 선별)
                 # 이제 이 함수가 텍스트까지 포함된 리스트를 반환합니다.
                 print("🎯 자료의 정확도를 분석 중입니다...")
-                if check_follow_up and old_talk : 
-                   refined_query = utill.rewrite_query_with_history(USER_ID,user_query)
-                else :
+                if not check_follow_up or not old_talk : 
                    refined_query =  f"{vector_query}({keyword_list})"
                 print(refined_query)
                 refined_data = utill.get_refined_context_rearrange(
