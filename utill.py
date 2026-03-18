@@ -328,6 +328,7 @@ def get_refined_context_rearrange(query: str, documents: List[str], top_n: int =
 
 def ask_ollama(context_text: str, user_query:str):
     # Ollama에게 보낼 최종 메시지 구조
+    today = datetime.now().strftime("%Y년 %m월 %d일")
     final_prompt = f"""[참고 자료]\n
                 {context_text}\n
                 [사용자 질문]\n
@@ -358,6 +359,7 @@ def ask_ollama(context_text: str, user_query:str):
                     "- 인사와 본인이 누군지 말하지 마라.\n"
                     "- 문법에 맞게 답변하세요.\n"
                     "- 같은 내용을 반복해서 말하지 마세요.\n"
+                     f"- 오늘 날짜는 {today}입니다. 모든 시간 질문은 이 날짜를 기준으로 답변하세요."
             )
             },
             {
@@ -973,7 +975,6 @@ def rewrite_query_with_history(user_id, current_query):
     # chat_history는 이전 대화 리스트
     history = get_refined_context(user_id)
     history_text = "\n".join([item['context'] for item in history])
-    today = datetime.now().strftime("%Y년 %m월 %d일")
     response = ollama_client.chat(model=OLLAMA_MODEL, messages=[
         {
             "role": "system",
@@ -991,7 +992,6 @@ def rewrite_query_with_history(user_id, current_query):
                 "- 질문만 출력하라.\n"
                 "- [마지막 질문]이 제일 중요하다.\n"
                 "- 한 문장으로 질문을 만들어라.\n"
-                f"- 오늘 날짜는 {today}입니다. 모든 시간 질문은 이 날짜를 기준으로 답변하세요."
                 
                 "### 출력 형식 ###\n"
                 "[만든 질문]"
