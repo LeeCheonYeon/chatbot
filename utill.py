@@ -883,7 +883,6 @@ def rewrite_question_keyword(question):
     content = response['message']['content']
     
     keyword_list = ""
-    print(content)
     for line in content.split('\n'):
         if "키워드" in line:
             keyword_list = re.sub(r"^[^\w\s]*\s*키워드\s*:\s*(.*?)\s*[^\w\s]*$", r"\1", line).strip()
@@ -984,6 +983,7 @@ def rewrite_query_with_history(user_id, current_query):
                 "- 너는 사용자의 질문[마지막 질문]과 이전대화[대화 내용]을 분석하여 '단독으로 검색 가능한 질문'으로 변환하는 '광주광역시도시공사' 전문 쿼리 생성기이다.\n\n"
         
                 "### 절대 규칙 ###\n"
+                "- [마지막 질문]을 분석하여 [이전대화]와 연관없으면 [이전대화]는 무시하세요.\n"
                 "- 절대 [마지막 질문]에 답변하지 마라.\n"
                 "- 반드시 질문에 없는 정보를 상상해서 추가하지 마라.\n"
                 "- [이전대화]의 점수는 최신 일수록 높습니다 점수가 높을수록 더 많은 가중치를 주세요.\n"
@@ -1000,7 +1000,7 @@ def rewrite_query_with_history(user_id, current_query):
         },
         {
             'role': 'user',
-            'content':  f" 이전대화: {history_text} \n\n 마지막 질문: {current_query}\n\n ### [변환 결과] ###",
+            'content':  f" [이전대화]: {history_text} \n\n [마지막 질문]: {current_query}\n\n ### [변환 결과] ###",
         },
         ],options={'temperature': 0, 'seed': 42})
     return response['message']['content']
