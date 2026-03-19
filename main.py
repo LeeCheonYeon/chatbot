@@ -60,13 +60,11 @@ def run_consulting_system():
 
                 refined_docs = [point.payload.get("rerank_chunk", "") for point in initial_docs.points]
                 print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"*3)
-                print(refined_docs)
                 # 3. 리랭커 필터링 (2단계: 점수 0.5 이상, 상위 3개 정밀 선별)
                 # 이제 이 함수가 텍스트까지 포함된 리스트를 반환합니다.
                 print("🎯 자료의 정확도를 분석 중입니다...")
                 if not check_follow_up or not old_talk : 
                    refined_query =  f"{vector_query}({keyword_list})"
-                print(refined_query)
                 refined_data = utill.get_refined_context_rearrange(
                     query=refined_query, 
                     documents=refined_docs, 
