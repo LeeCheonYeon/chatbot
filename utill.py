@@ -386,13 +386,14 @@ def ask_ollama_follow(context_text: str, user_query:str, talk:str):
                 [참고 자료]\n
                 {context_text}\n
                 [사용자 질문]\n
-                '{user_query}'에 대해 상세히 설명해줘."""
+                '{user_query}"""
     response = ollama_client.chat(model=OLLAMA_MODEL, messages=[
             {
                 "role": "system",
                 "content": (
                     "당신은 제공된 [대화 내용] 과 [참고 자료]에만 근거하여 답변하는 '광주광역시도시공사' 비즈니스 비서입니다.\n\n"
                     "### 반드시 지켜야 할 출력 원칙 ###\n"
+                    "- [사용자 질문]을 분석해서 [대화 내용]과 연관되지 않으면 [대화 내용]은 무시하세요.\n"
                     "- 절대 질문으로 답변하지 마세요.\n"
                     "- 자료에 답변 근거가 있다면: 상세 내용을 경어체로 설명하세요.\n"
                     "- 자료에 답변 근거가 전혀 없다면: 군더더기 없이 '정보를 찾을 수 없습니다.' 딱 한 문장만 출력하세요.\n"
