@@ -86,7 +86,7 @@ def run_consulting_system():
                     context_text = utill.normalize_table_merged_cells(context_text)
                     #context_text = utill.process_to_markdown(context_text)
                     context_text = utill.remove_tag_text(context_text)
-                    # (선택 사항) 디버깅용 점수 출력
+                    # (선택 사항) 디버깅용 점수 출력check_is_follow_up
                     if refined_data:
                         scores = [f"{item['score']:.2f}" for item in refined_data]
                         print(f"참고 자료 신뢰도: {', '.join(scores)}")
