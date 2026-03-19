@@ -43,6 +43,7 @@ def run_consulting_system():
             #ollama를 통해서 질문을 검색용 문장 및 키워드로 변경
             vector_query = utill.rewrite_query_with_history(USER_ID,user_query)
             refined_query = vector_query
+        print(refined_query)
         print("="*60)
         print(keyword_list)
         if keyword_list:
@@ -95,7 +96,7 @@ def run_consulting_system():
                     print("✍️ 답변을 생성하는 중입니다. 잠시만 기다려 주세요...\n")
                     print(f"{len(context_text)} 길이")
                     if check_follow_up and old_talk :
-                        old_talk_ = "\n".join([item['context'] for item in old_talk])
+                        old_talk_ = "\n\n".join([item['context'] for item in old_talk])
                         answer = utill.ask_ollama_follow(context_text,vector_query,old_talk_)
                     else:
                         answer = utill.ask_ollama(context_text,vector_query)
